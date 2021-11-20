@@ -1,0 +1,167 @@
+##[
+    symmetric group defined over a set's operation is function composition.🤯
+    elements are all bijections of that set to itself. 
+    if a type is a set, bijections are proc(x:T):T 
+    
+    sudoku is S3 \wreath\ S3 and so forth
+    Cayley's theorum:  every group is isomorphic to symmetry group 
+    group is a set with a binary operation.
+]##
+
+
+type
+    Group = concept
+      ## a group is a set with a binary operation
+      ## a type is a set
+      ## a binary operation takes two elements and produces a third 
+      proc group_operation(x,y:Self):Self
+      ## like addition or multiplication or something
+        
+    ## symmetry is a group where the elements are bijections
+    ## of a set onto another set. it has to be injective and surjective
+    ## injective: unique mapping
+    ## surjective: no unpaired elements
+    ## so T,U have the same cardinality
+    Symmetry[T,U] = proc(x:T):U 
+    ## i'm not sure how we can express that rest
+    ## 
+proc cardinality(T:typedesc):int =
+    #hmmm.
+    # well, in the case where T is ordinal, that's trivial
+    when T is Ordinal:
+        T.high - T.low
+    # that's set, range, SomeInteger 
+    when T is float32:
+        #not quite sizeof T. lots of nans, many operations don't map onto subnormals
+        # subnormals + zeros + normals + infinities + nans = 2^sizeof(T)
+        # depends how many of those we want to count as being different
+    elif T is object:
+        #sum of the cardinality of its fields
+        for F in T.fields:
+            result += F.cardinality
+    elif T is string | seq | ref
+        # it's T.cardinality * t.len runtime cardinality
+        # lets just say undefined for now
+        {.error.}
+proc group_operation(f:Symmetry[T,U],g:Symmetry[U,V]):Symmetry[T,V] = (x:T)=>f(g(x))
+    ## most useful when f,g are generic functions
+    #x(y) so what does that mean.
+    # this is what monads are for, they specify what that means
+        #now we have a U
+        # so f must also be valid for U
+        # or specify some way to convert f(x:T):U into f(x:U):V
+    #fmap tells us how to convert f(x:T):U into f(x: F[T] ): F[U]
+    #no that's not quite what i want.  fmap gives us an f(x:)
+    #
+type Cell = range[0..9]
+#so what's S3 3 is the number of elements in t
+# bijection is any function f(x:Cell):T for example
+
+#wreath product
+#if A and H are groups, and O is a set with H acting on it from the left
+#H group action is
+#group has identity, right. that's the element for which Id op Id = Id
+# ok so action is some function 
+# symmetry group acts on set{0..n} by permuting the elements
+# that's proc group_action(x:H,y:O):O  such that! group_action(H.id,y) = y and composability g(x,g(y,z)) = g(xy,z) where xy is group operation on H obvs
+proc group_action[T:Group; U](x: T, y: U): U =
+    #static_assert for_all U: group_action(T.identity,u) == u
+    #static_assert for_all x in T, y in T, u in U:
+        # group_action(x,group_action(y,u)) == group_action(group_operation(x,y),u)
+    when T is range[0..3]:
+        #permute elements of y
+
+#direct product is just (G,H)
+#
+# K is direct product of copies of Aw := A indexed by O (no idea)
+# yes. we need to be able to index into A with O. i.e. there is `[]` defined and is unique
+type Indexable[T,U] = concept
+  proc `[]`(i:U):T #and this is unique but we can probably relax that
+proc indexableBy(X,Y:typedesc):bool = 
+    for x in {X}:
+        for y in {Y}:
+            x[y] is X
+##[
+    semi-direct product
+
+
+]##
+
+##[ 
+    wreath product
+
+    A,B are groups. type A^B = proc(a:B):A  === array[A,card(B.fullSet)]
+    this is a group (A,A,A,A...) card(B.fullSet) copies of A
+    i.e. AxAxA B many times. ok sure
+    the group of all functions A->B  has cardinality |A| * |B| ok sure.
+    this is the point of currying. ok i get it i think. that's wikipedia's K
+    K is indexed by omega. aha. (A,A,A...). ok why not just use B oh i see you do
+
+    wreath is semi-direct prouct of  K and B.  (A....) x B that is (B,K) where op is defined as (x,w)op (y,v) = (xy,w^yv)
+]##
+type K[A,B] = proc(b:B):A
+type W[A,B] = (k:K[A,B],b:B)
+#proc `*`[A,B](x,y:K):K = (b:B) => x(y(b)) #i keep getting here
+proc `*`(x,y:B):B #is defined
+# because that's all it ever could be.
+# ok whatever. so 
+proc `^`[A,B](w:K[A,B],b:B):K[A,B] = 
+    proc (x:B):A = 
+        w(x * b.inv)
+
+proc `*`[A,B](u,v:W[A,B]):W[A,B] = (b: u.b * v.b,
+                                    k: (u.k ^ u.b) * v.b ) 
+proc `[]`(k:K[A],w:O):A = k[w] #
+type
+    Swizzleable[N:static int] = concept c, type t
+        t.high - t.low == N
+proc `[]`[N:static int](x:S[N],y:range):Smember[3]
+proc init(x: typedesc[Foo], y: typeof S[3][default(Foo)] ) = S
+proc group_action(x:S3,y:range['a'..'c']):range['a'..'c'] = init(range['a'..'c'],x[y])  
+
+#-------------------------------------------------_#
+import sugar
+type
+    Group = concept
+        proc id(t:typedesc[Self]):Self
+        proc inv(s:Self):Self
+        proc `*`(a,b:Self):Self
+template `^`[A:Group,B:Group](a:typedesc[A],b:typedesc[B]):type = 
+    #is it a group?
+    type AB = B->A
+    proc id(t:typedesc[AB]):AB = (b:B)=>A.id 
+    #(A,A,A...) * (A,A,A...) = (A*A,A*A,A*A...)
+    proc `*`(f,g:AB):AB = (b:B) => f(b) * g(b)
+    # ab * ab.inv = ab.id
+    #             = (b:B) => A.id
+    # ab(b) * ab.inv(b) =
+    # ab.inv(b) === ab(b).inv
+    proc inv(s:AB):AB = (b:B) => s(b).inv 
+    #interestingly, only A needs to be a group
+    AB
+
+template `%`[A:Group,B:Group](a:typedesc[A],b:typedesc[B]):type =    
+    ## Wreath Product
+    type K = A^B
+    type W = (b: B,k: K)
+    proc `^`(k:K,b:B):K = (b:B) => k(x * b.inv)
+    proc `*`(x,y:W):W = (b: x.b * y.b, k: (x.k ^ y.b) * y.k)
+
+    proc id(w:typedesc[W]):W = (b: W.B.id, k: W.K.id)
+
+    proc inv(w:W):W = (b: w.b.inv, k: w.k.inv)
+
+
+type
+    thr = range[1.thr..3]
+    S3 = array[thr,thr]
+proc id(s:typedesc[S3]):S3 = (1,1,1)
+import std/setutils
+proc `*`(x,y:S3):S3 =
+    for i in thr.fullSet:
+        result[i] = x[y[i]]
+
+
+
+
+
